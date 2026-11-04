@@ -44,7 +44,7 @@ class AgentToolTests(unittest.TestCase):
                     "api": {"ok": True, "used_percent": 5, "initial_budget": 100.0,
                             "spent": 5.0, "currency": "EUR", "reset_at": reset},
                     "vibe": {"ok": True, "used_percent": 10, "initial_budget": 200,
-                             "spent": 25.5, "currency": "EUR", "reset_at": reset},
+                             "spent": 20.0, "currency": "EUR", "reset_at": reset},
                 }
                 history.record(sample)
                 # Do not require a real Hermes installation for the contract test.
