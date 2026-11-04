@@ -1,6 +1,6 @@
 manifest_version: 1
 name: hermes-mistral-usage
-version: "0.1.0"
+version: "0.2.1"
 description: Read-only Mistral Vibe quota and API billing monitor for Hermes Desktop.
 author: p7s6sr5bnf-source
 license: MIT
