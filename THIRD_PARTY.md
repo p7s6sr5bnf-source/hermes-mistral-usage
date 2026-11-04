@@ -1,13 +1,14 @@
-# Acknowledgments
+# Origins and acknowledgements
 
-The Mistral endpoint approach and response field mapping were informed by
-[UsageBar](https://github.com/lfmundim/UsageBar), by Lucas Mundim (MIT license,
-Copyright (c) 2026 Lucas Mundim). This implementation is independently written
-in Python for Hermes and does not copy the original TypeScript source.
+The initial Mistral API endpoint research was informed by
+[UsageBar](https://github.com/lfmundim/UsageBar), © 2026 Lucas Mundim
+(MIT). The monitor is independently implemented in Python and does not
+include code copied from UsageBar.
 
-Unofficial endpoints used:
-- `https://admin.mistral.ai/api/billing/v2/usage`
-- `https://console.mistral.ai/api-ui/trpc/billing.vibeUsage`
+The currently implemented subscription budget endpoint was identified from
+Mistral Admin browser DevTools by the repository owner:
+`https://admin.mistral.ai/api/local-trpc/billing.budget`.
 
-These are not published or supported public APIs. Verify permission and
-Mistral's terms before enabling automatic polling.
+This endpoint is an **unofficial, undocumented browser API**. Compatibility,
+authentication rules and availability may change without warning. Respect
+Mistral's applicable terms. No browser credentials belong in this repository.
