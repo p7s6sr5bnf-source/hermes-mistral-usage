@@ -12,6 +12,7 @@ import statistics
 import math
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS observations (
@@ -67,7 +68,11 @@ def _connect(create=False):
             raise ValueError("History database needs owner-only permissions")
         if hasattr(os, "getuid") and st.st_uid != os.getuid():
             raise ValueError("History database owner mismatch")
-    con = sqlite3.connect(str(path), timeout=5)
+    if create:
+        con = sqlite3.connect(str(path), timeout=5)
+    else:
+        # The Agent-side reader is strictly read-only at SQLite level.
+        con = sqlite3.connect("file:" + quote(str(path)) + "?mode=ro", uri=True, timeout=5)
     try:
         if create:
             os.chmod(path, 0o600)
