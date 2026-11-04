@@ -41,9 +41,9 @@ class AgentToolTests(unittest.TestCase):
                 reset = (now + timedelta(days=20)).isoformat()
                 sample = {
                     "fetched_at": now.isoformat(),
-                    "api": {"ok": True, "used_percent": 5, "initial_budget": 25.5,
-                            "spent": 1.275, "currency": "EUR", "reset_at": reset},
-                    "vibe": {"ok": True, "used_percent": 10, "initial_budget": 255,
+                    "api": {"ok": True, "used_percent": 5, "initial_budget": 100.0,
+                            "spent": 5.0, "currency": "EUR", "reset_at": reset},
+                    "vibe": {"ok": True, "used_percent": 10, "initial_budget": 200,
                              "spent": 25.5, "currency": "EUR", "reset_at": reset},
                 }
                 history.record(sample)
