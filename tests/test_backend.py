@@ -54,13 +54,30 @@ class BackendTests(unittest.TestCase):
                 with self.assertRaises(backend.FetchError):
                     backend._read_cookie()
 
-    def test_independent_failures(self):
-        with patch.object(backend, "_read_cookie", return_value="a=1"):
-            with patch.object(backend, "_vibe", side_effect=backend.FetchError("vibe down")):
-                with patch.object(backend, "_billing", return_value={"ok": True, "spent": 1}):
-                    result = backend._collect()
-                    self.assertFalse(result["vibe"]["ok"])
-                    self.assertTrue(result["api"]["ok"])
+    def test_subscription_budget_schema(self):
+        item = backend._budget_item({
+            "usage_percentage": 1.86366963, "initial_budget": 25.5,
+            "currency": "EUR", "reset_at": "2026-12-01T00:00:00Z"
+        })
+        self.assertTrue(item["ok"])
+        self.assertAlmostEqual(item["spent"], 0.475236, places=5)
+        self.assertAlmostEqual(item["remaining_percent"], 98.13633037, places=5)
+
+    def test_subscription_budgets(self):
+        payload = {"result": {"data": {"json": {
+            "api_budget": {"usage_percentage": 1, "initial_budget": 25.5, "currency": "EUR"},
+            "vibe_budget": {"usage_percentage": 0.5, "initial_budget": 255, "currency": "EUR"}
+        }}}}
+        with patch.dict(os.environ, {"MISTRAL_SUBSCRIPTION_BUDGET_URL": "https://admin.mistral.ai/api/trpc/billing.budget?input=test"}):
+            with patch.object(backend, "_get_json", return_value=payload):
+                api, vibe = backend._subscription_budgets("x=1")
+                self.assertEqual(api["initial_budget"], 25.5)
+                self.assertEqual(vibe["initial_budget"], 255)
+
+    def test_reject_untrusted_host(self):
+        with patch.dict(os.environ, {"MISTRAL_SUBSCRIPTION_BUDGET_URL": "https://evil.example/api/trpc/billing.budget"}):
+            with self.assertRaises(backend.FetchError):
+                backend._budget_url()
 
 
 if __name__ == "__main__":
