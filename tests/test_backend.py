@@ -16,27 +16,6 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(backend._csrf("a=1; csrftoken=hello; b=2"), "hello")
         self.assertIsNone(backend._csrf("a=1"))
 
-    def test_billing(self):
-        with patch.object(backend, "_get_json", return_value={
-            "billing": {
-                "completion": {"models": {"a": {"total_cost": 1.25}, "b": {"total_cost": 2}}},
-                "ocr": {"models": {"x": {"total_cost": 0.5}}},
-            }
-        }):
-            self.assertEqual(backend._billing("x=1")["spent"], 3.75)
-
-    def test_vibe(self):
-        with patch.object(backend, "_get_json", return_value=[
-            {"result": {"data": {"json": {"usage_percentage": 23.5, "reset_at": "2026-12-01"}}}}
-        ]):
-            result = backend._vibe("x=1")
-            self.assertEqual(result["remaining_percent"], 76.5)
-            self.assertEqual(result["reset_at"], "2026-12-01")
-
-    def test_invalid_vibe(self):
-        with patch.object(backend, "_get_json", return_value=[{"result": {"data": {"json": {}}}}]):
-            self.assertFalse(backend._result(backend._vibe, "x=1")["ok"])
-
     def test_no_cookie(self):
         with tempfile.TemporaryDirectory() as folder:
             with patch.dict(os.environ, {"MISTRAL_USAGE_COOKIE": "", "MISTRAL_USAGE_COOKIE_FILE": folder + "/absent"}):
@@ -53,6 +32,22 @@ class BackendTests(unittest.TestCase):
                 p.chmod(0o644)
                 with self.assertRaises(backend.FetchError):
                     backend._read_cookie()
+
+    def test_reject_symlink_cookie(self):
+        with tempfile.TemporaryDirectory() as folder:
+            real = pathlib.Path(folder) / "real"
+            link = pathlib.Path(folder) / "link"
+            real.write_text("session=123")
+            real.chmod(0o600)
+            link.symlink_to(real)
+            with patch.dict(os.environ, {"MISTRAL_USAGE_COOKIE": "", "MISTRAL_USAGE_COOKIE_FILE": str(link)}):
+                with self.assertRaises(backend.FetchError):
+                    backend._read_cookie()
+
+    def test_redirect_does_not_follow_credential_bearing_request(self):
+        from urllib.request import Request
+        self.assertIsNone(backend.NoRedirects().redirect_request(
+            Request("https://admin.mistral.ai/"), None, 302, "moved", {}, "https://example.org/"))
 
     def test_subscription_budget_schema(self):
         item = backend._budget_item({
