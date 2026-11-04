@@ -13,7 +13,8 @@ const DEFAULTS = Object.freeze({
   notifications: true,
   anomalyAlerts: true,
   colors: true,
-  pollMinutes: 5
+  pollMinutes: 5,
+  historyDays: 30
 })
 const INTERVALS = [5, 10, 15, 30]
 let runtime = null
@@ -29,6 +30,8 @@ function normalized(raw) {
   }
   if (!INTERVALS.includes(Number(s.pollMinutes))) s.pollMinutes = 5
   s.pollMinutes = Number(s.pollMinutes)
+  if (![7, 30, 90].includes(Number(s.historyDays))) s.historyDays = 30
+  s.historyDays = Number(s.historyDays)
   return s
 }
 
@@ -83,6 +86,11 @@ function makeRuntime(ctx) {
     ctx.storage.set('preferences', state.settings)
     state.emit()
     state.checkAlerts()
+    if (patch.historyDays != null) {
+      ctx.rest('/insights?days=' + state.settings.historyDays)
+        .then(next => { if (!state.disposed) { state.insights = next; state.emit() } })
+        .catch(() => { if (!state.disposed) { state.insights = null; state.emit() } })
+    }
   }
   state.checkAlerts = () => {
     if (!state.data || !state.settings.notifications) return
@@ -144,7 +152,7 @@ function makeRuntime(ctx) {
         state.error = ''
         state.lastPoll = Date.now()
         try {
-          state.insights = await ctx.rest('/insights?days=30')
+          state.insights = await ctx.rest('/insights?days=' + state.settings.historyDays)
         } catch {
           state.insights = null
         }
@@ -346,6 +354,9 @@ function SettingsPage() {
     jsx('p', { className: 'text-sm text-(--ui-text-tertiary)',
       children: 'Réglages locaux Hermes Desktop. Les seuils utilisent toujours le pourcentage consommé, indépendamment du format affiché.' }),
     jsx('h3', { className: 'font-semibold', children: 'Affichage' }),
+    jsx(SelectSetting, { label: 'Historique graphique', value: String(s.historyDays),
+      values: [['7', '7 jours'], ['30', '30 jours'], ['90', '90 jours']],
+      change: v => set('historyDays', Number(v)) }),
     jsx(SelectSetting, { label: 'Valeur affichée', value: s.display,
       values: [['used', 'Consommé'], ['remaining', 'Restant']], change: v => set('display', v) }),
     jsx(SelectSetting, { label: 'Unité', value: s.units,
