@@ -55,7 +55,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_forecast_after_multiple_days(self):
         now = datetime.now(timezone.utc)
-        reset = (now + timedelta(days=18)).isoformat()
+        reset = (now + timedelta(days=30)).isoformat()
         for i in range(5):
             self.assertTrue(history.record(snapshot(now-timedelta(days=4-i),
                               used_api=10+i*4, used_vibe=2+i, cycle=reset)))
