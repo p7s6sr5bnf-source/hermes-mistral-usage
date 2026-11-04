@@ -105,6 +105,8 @@ def _get_json(url, cookie, referer, timeout):
             return json.loads(raw)
     except HTTPError as exc:
         # Never include response bodies, URLs or request headers in errors.
+        if exc.code in (301, 302, 303, 307, 308):
+            raise FetchError("Mistral redirected the request; check session authentication or cookie scope.") from None
         if exc.code in (401, 403):
             raise FetchError("Mistral session expired or unauthorized.") from None
         if exc.code == 429:
