@@ -1,15 +1,9 @@
 # Hermes Mistral Usage
 
 A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
-Native sidebar page and status-bar chip display the *real* Mistral Vibe usage
-percentage and organization-level API spending from the web session. No token
-estimates, no LLM calls, no changes to configured model providers.
+Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
 
-> **Status: V0.1 candidate, not yet tested against a real Mistral account.**
-> Endpoints are unofficial and can change. Do not treat results as billing
-> statements or as per-API-key metrics. A numeric billing value has **no
-> asserted currency** because the endpoint response mapping has not been
-> independently verified for this account.
+> **Status: V0.2 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact network Request URL still needs to be supplied; the endpoint is unofficial.
 
 ## Install (from repository)
 
@@ -47,7 +41,14 @@ your cookie into chat, GitHub, Hermes agent prompts, a URL or a shell command.**
    `~/.config/hermes-mistral-usage/session.cookie` with mode 0600. If you
    install on Linux and macOS independently, configure the session **separately**
    on both machines.
-4. Restart/reload the Hermes backend if necessary, and enable the plugin in
+4. In DevTools Network → select `billing.budget` → Headers → General,
+   copy the exact **Request URL**. Configure it in the **trusted backend process**
+   as `MISTRAL_SUBSCRIPTION_BUDGET_URL`. Only HTTPS requests to
+   `admin.mistral.ai` with a path ending in `/billing.budget` are accepted.
+   The exact URL (including `input`) has not yet been confirmed and is not
+   hardcoded. Check that the query string contains no sensitive tokens before
+   storing it in an environment variable.
+5. Restart/reload the Hermes backend if necessary, and enable the plugin in
    Hermes Desktop. The view refreshes automatically every 5 minutes.
 
 For deployment without the helper script, supply `MISTRAL_USAGE_COOKIE` as an
@@ -57,9 +58,10 @@ variables can be exposed to local process administrators; prefer the file.
 
 ## UI and monitoring
 
-- Vibe Code: **used / remaining percentage** and reset time, when returned.
-- API: **monthly organization billing value** (unit not verified in V0.1).
-- Independent Vibe/API failures: a failure of one endpoint does not hide the other.
+- Vibe Code: included budget, used / remaining percentages and reset time.
+- API: included budget, used / remaining percentages and reset time.
+- Both derive from the same subscription budget response; an endpoint failure makes both unavailable.
+- Pay-as-you-go is deliberately excluded; no per-key consumption is claimed.
 - Status bar: Vibe remaining percentage, or a dash if unavailable.
 - Automatic refresh every five minutes. Shared cache TTL = 300 s; manual
   refresh observes a minimum 30 s interval.
@@ -95,6 +97,10 @@ The first three checks require Python with `fastapi` (usually supplied by
 Hermes) and Node.js; `hermes plugins validate` requires a compatible Hermes
 installation. Live authenticated testing must be performed locally; CI must
 never have a production web-session cookie.
+
+## Confirmed subscription schema
+
+`billing.budget` returns `result.data.json.api_budget` and `vibe_budget`, each with `usage_percentage`, `initial_budget`, `currency` and `reset_at`. The top-level percentage is **not** a third independent budget. The `billing.usageLimits` response represents Pay-as-you-go and is not used.
 
 ## Origins
 
