@@ -8,3 +8,14 @@ cookie*
 config.json
 .venv/
 node_modules/
+
+# Secrets, local browser credentials and diagnostic payloads
+**/session.cookie
+**/cookies.sqlite
+*.har
+*.pem
+*.key
+*.p12
+*.pfx
+.secrets/
+credentials.json
