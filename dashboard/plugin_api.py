@@ -199,8 +199,8 @@ def _collect():
     }
     try:
         history_store.record(snapshot)
-    except (OSError, ValueError, RuntimeError):
-        # A read-only or unwritable history volume never breaks live quotas.
+    except Exception:
+        # An unwritable or corrupt history database must never break live quotas.
         pass
     return snapshot
 
@@ -235,5 +235,5 @@ def insights(days: int = 30):
     """Public to authenticated Hermes dashboard only; numeric local history."""
     try:
         return history_store.overview(days=days)
-    except (OSError, ValueError, RuntimeError):
+    except Exception:
         return {"status": "history_unavailable", "api": {}, "vibe": {}}
