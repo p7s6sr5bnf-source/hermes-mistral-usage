@@ -17,10 +17,10 @@ def snapshot(time, used_api=4, used_vibe=2, cycle=None):
     cycle = cycle or (time + timedelta(days=25)).isoformat()
     return {
         "fetched_at": time.isoformat(),
-        "api": {"ok": True, "used_percent": used_api, "initial_budget": 25.5,
+        "api": {"ok": True, "used_percent": used_api, "initial_budget": 100.0,
                 "spent": 25.5*used_api/100, "currency": "EUR", "reset_at": cycle},
-        "vibe": {"ok": True, "used_percent": used_vibe, "initial_budget": 255.0,
-                 "spent": 255*used_vibe/100, "currency": "EUR", "reset_at": cycle},
+        "vibe": {"ok": True, "used_percent": used_vibe, "initial_budget": 200.0,
+                 "spent": 200*used_vibe/100, "currency": "EUR", "reset_at": cycle},
     }
 
 
