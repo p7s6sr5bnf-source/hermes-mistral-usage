@@ -199,18 +199,9 @@ def _budget_item(value):
 
 
 def _budget_url():
-    # The exact Request URL (including its input query) needs confirmation
-    # from the user's browser before we hardcode it. No arbitrary hosts.
-    value = os.environ.get("MISTRAL_SUBSCRIPTION_BUDGET_URL", "")
-    if not value:
-        raise FetchError("Set MISTRAL_SUBSCRIPTION_BUDGET_URL from DevTools Request URL.")
-    parts = urlsplit(value)
-    if (parts.scheme != "https" or parts.hostname != "admin.mistral.ai"
-            or parts.username or parts.password or parts.port
-            or not parts.path.endswith("/billing.budget")
-            or parts.fragment or len(value) > 4096):
-        raise FetchError("Subscription budget URL must be the Mistral Admin billing.budget request.")
-    return value
+    # Observed in Mistral Admin DevTools, November 2026.
+    # Unofficial endpoint; no user-controlled host or query parameters.
+    return "https://admin.mistral.ai/api/local-trpc/billing.budget?input=%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%5D%2C%22v%22%3A1%7D%7D"
 
 
 def _subscription_budgets(cookie):
