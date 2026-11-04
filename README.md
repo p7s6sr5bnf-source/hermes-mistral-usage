@@ -63,7 +63,7 @@ survives plugin source updates and is never committed to Git. Data older than
 400 days is pruned automatically on subsequent successful writes.
 
 **Desktop:** after at least two days of observations, the Mistral Usage page
-shows daily usage charts. The remaining daily allowance is based on the reset
+shows daily usage charts, with a configurable 7, 30 or 90-day window. The remaining daily allowance is based on the reset
 time and unspent budget. The seven-day linear depletion projection requires
 three distinct observation days and at least 24 hours; the forecast is an
 estimate, not a guarantee. Periods are isolated by the returned `reset_at`.
@@ -105,6 +105,7 @@ The status-bar chip and the Mistral Usage page use the same preferences:
 - Separate Vibe and API alert thresholds, 1–100% used (80% by default).
 - Native OS notifications (Linux/macOS), enabled by default. Deduplicated using each
   metric's reset date and threshold, persisted in Hermes Desktop's plugin storage.
+- Graph history interval: 7, 30 or 90 days, with a default of 30 days.
 - Poll interval: 5, 10, 15, or 30 minutes; the backend enforces a 5-minute normal
   cache and a minimum 30-second interval for manual refresh.
 - Reset preferences button. Preference changes immediately update the status bar and page.
