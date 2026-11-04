@@ -1,0 +1,7 @@
+{
+  "name": "hermes-mistral-usage",
+  "label": "Mistral Usage",
+  "description": "Read-only Mistral Vibe and API billing metrics",
+  "version": "0.1.0",
+  "api": "plugin_api.py"
+}
