@@ -78,14 +78,31 @@ function UsagePage() {
   })
 }
 
+function formatPercentUsed(metric) {
+  return metric?.ok && Number.isFinite(metric.used_percent)
+    ? metric.used_percent.toFixed(1) + '%'
+    : '—'
+}
+
 function UsageChip() {
   const { data } = useUsage()
   const vibe = data?.vibe
-  const label = vibe?.ok ? 'Mistral ' + vibe.remaining_percent.toFixed(0) + '%' : 'Mistral —'
-  return jsx('button', { type: 'button',
-    title: 'Open Mistral usage', onClick: () => host.navigate('/mistral-usage'),
-    className: 'px-2 text-xs text-(--ui-text-tertiary) hover:text-foreground',
-    children: label })
+  const api = data?.api
+  const vibeText = formatPercentUsed(vibe)
+  const apiText = formatPercentUsed(api)
+  const label = `Vibe ${vibeText} · API ${apiText}`
+  const title = `Mistral subscription quota used — Vibe: ${vibeText}, API: ${apiText}. Click for details.`
+  return jsx('button', {
+    type: 'button',
+    title,
+    onClick: () => host.navigate('/mistral-usage'),
+    className: 'inline-flex items-center gap-1.5 px-2 text-xs text-(--ui-text-tertiary) hover:text-foreground whitespace-nowrap',
+    children: [
+      jsx('span', { className: 'font-medium', children: 'Mistral' }),
+      jsx('span', { children: '·' }),
+      jsx('span', { children: label })
+    ]
+  })
 }
 
 export default {
