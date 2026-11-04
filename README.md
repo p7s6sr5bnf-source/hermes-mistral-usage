@@ -3,7 +3,7 @@
 A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
 Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
 
-> **Status: V0.2 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact network Request URL still needs to be supplied; the endpoint is unofficial.
+> **Status: V0.2 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
 
 ## Install (from repository)
 
@@ -41,13 +41,7 @@ your cookie into chat, GitHub, Hermes agent prompts, a URL or a shell command.**
    `~/.config/hermes-mistral-usage/session.cookie` with mode 0600. If you
    install on Linux and macOS independently, configure the session **separately**
    on both machines.
-4. In DevTools Network → select `billing.budget` → Headers → General,
-   copy the exact **Request URL**. Configure it in the **trusted backend process**
-   as `MISTRAL_SUBSCRIPTION_BUDGET_URL`. Only HTTPS requests to
-   `admin.mistral.ai` with a path ending in `/billing.budget` are accepted.
-   The exact URL (including `input`) has not yet been confirmed and is not
-   hardcoded. Check that the query string contains no sensitive tokens before
-   storing it in an environment variable.
+4. The observed `billing.budget` URL is already embedded in the plugin. No URL environment variable is required.
 5. Restart/reload the Hermes backend if necessary, and enable the plugin in
    Hermes Desktop. The view refreshes automatically every 5 minutes.
 
