@@ -14,7 +14,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from fastapi import APIRouter
@@ -23,11 +22,6 @@ router = APIRouter()
 CACHE_SECONDS = 300
 MIN_REFRESH_SECONDS = 30
 MAX_RESPONSE_BYTES = 2_000_000
-BILLING_URL = "https://admin.mistral.ai/api/billing/v2/usage"
-VIBE_URL = (
-    "https://console.mistral.ai/api-ui/trpc/billing.vibeUsage?"
-    "batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D"
-)
 _lock = threading.Lock()
 _cache = None
 _cache_time = 0.0
@@ -61,9 +55,24 @@ def _read_cookie():
         return None
     if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
         raise FetchError("Cookie file must be regular and mode 0600.")
+    if info.st_nlink != 1:
+        raise FetchError("Cookie file must not have multiple hard links.")
     if hasattr(os, "getuid") and info.st_uid != os.getuid():
         raise FetchError("Cookie file must be owned by the current user.")
-    return _validate_cookie(path.read_text(encoding="utf-8").strip())
+    # Read after checking ownership and permissions; O_NOFOLLOW avoids symlinks.
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        opened = os.fstat(fd)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_mode & 0o077
+                or opened.st_nlink != 1 or (hasattr(os, "getuid") and opened.st_uid != os.getuid())):
+            raise FetchError("Cookie file permissions or owner changed.")
+        with os.fdopen(fd, "r", encoding="utf-8") as file:
+            fd = -1
+            return _validate_cookie(file.read(16001).strip())
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 def _validate_cookie(cookie):
@@ -114,68 +123,6 @@ def _get_json(url, cookie, referer, timeout):
         raise FetchError("Mistral HTTP error " + str(exc.code)) from None
     except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         raise FetchError("Mistral request or JSON response failed.") from None
-
-
-def _billing(cookie):
-    now = datetime.now().astimezone()
-    url = BILLING_URL + "?" + urlencode({"month": now.month, "year": now.year})
-    result = _get_json(url, cookie, "https://admin.mistral.ai/organization/usage", 15)
-    billing = result.get("billing") if isinstance(result, dict) else None
-    if not isinstance(billing, dict):
-        raise FetchError("Mistral billing schema changed or missing.")
-    total = 0.0
-    model_count = 0
-    for category in billing.values():
-        if not isinstance(category, dict):
-            continue
-        models = category.get("models", {})
-        if not isinstance(models, dict):
-            continue
-        for model in models.values():
-            if not isinstance(model, dict):
-                continue
-            cost = model.get("total_cost")
-            if isinstance(cost, (int, float)) and not isinstance(cost, bool):
-                total += float(cost)
-                model_count += 1
-    if model_count == 0:
-        # Empty billing may be legitimate; report zero only for empty category sets.
-        if any(isinstance(c, dict) and c.get("models") for c in billing.values()):
-            raise FetchError("Mistral billing cost fields unavailable.")
-    return {
-        "ok": True, "spent": round(total, 6),
-        "currency": "unspecified", "month": now.month, "year": now.year,
-        "scope": "organization", "source": "mistral-web-session",
-    }
-
-
-def _vibe(cookie):
-    result = _get_json(
-        VIBE_URL, cookie, "https://console.mistral.ai/codestral/cli", 10
-    )
-    try:
-        data = result[0]["result"]["data"]["json"]
-        used = data["usage_percentage"]
-    except (KeyError, IndexError, TypeError):
-        raise FetchError("Mistral Vibe response schema changed.") from None
-    if not isinstance(used, (int, float)) or isinstance(used, bool) or not 0 <= used <= 100:
-        raise FetchError("Mistral Vibe percentage invalid.")
-    return {
-        "ok": True, "used_percent": float(used),
-        "remaining_percent": round(100.0 - float(used), 2),
-        "reset_at": data.get("reset_at"), "scope": "subscription",
-        "source": "mistral-web-session",
-    }
-
-
-def _result(fn, cookie):
-    try:
-        return fn(cookie)
-    except FetchError as exc:
-        return {"ok": False, "error": str(exc)}
-    except Exception:
-        # Do not expose untrusted API response or exception details to UI/logs.
-        return {"ok": False, "error": "Unexpected Mistral response error."}
 
 
 def _budget_item(value):
@@ -263,4 +210,4 @@ def usage(refresh: bool = False):
 @router.get("/health")
 def health():
     # Never include the cookie, headers, account IDs or billing amounts here.
-    return {"ok": True, "version": "0.1.0", "configured": bool(os.environ.get("MISTRAL_USAGE_COOKIE")) or _cookie_path().exists()}
+    return {"ok": True, "version": "0.2.1", "configured": bool(os.environ.get("MISTRAL_USAGE_COOKIE")) or _cookie_path().exists()}
