@@ -7,6 +7,7 @@ credentials to the Desktop renderer or persist them in the plugin repository.
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import stat
 import threading
@@ -18,6 +19,16 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from fastapi import APIRouter
 
+def _load_history():
+    """Load the shared local history module without changing sys.path."""
+    module_path = Path(__file__).resolve().parent.parent / "usage_history.py"
+    spec = importlib.util.spec_from_file_location("hermes_mistral_usage_history", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+history_store = _load_history()
 router = APIRouter()
 CACHE_SECONDS = 300
 MIN_REFRESH_SECONDS = 30
@@ -182,10 +193,16 @@ def _collect():
     except Exception:
         return {"configured": True, "vibe": {"ok": False, "error": "Unexpected subscription budget response."},
                 "api": {"ok": False, "error": "Unexpected subscription budget response."}, "fetched_at": None}
-    return {
+    snapshot = {
         "configured": True, "vibe": vibe, "api": api,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
+    try:
+        history_store.record(snapshot)
+    except (OSError, ValueError, RuntimeError):
+        # A read-only or unwritable history volume never breaks live quotas.
+        pass
+    return snapshot
 
 
 def get_usage(force=False):
@@ -210,4 +227,13 @@ def usage(refresh: bool = False):
 @router.get("/health")
 def health():
     # Never include the cookie, headers, account IDs or billing amounts here.
-    return {"ok": True, "version": "0.2.1", "configured": bool(os.environ.get("MISTRAL_USAGE_COOKIE")) or _cookie_path().exists()}
+    return {"ok": True, "version": "0.4.0", "configured": bool(os.environ.get("MISTRAL_USAGE_COOKIE")) or _cookie_path().exists()}
+
+
+@router.get("/insights")
+def insights(days: int = 30):
+    """Public to authenticated Hermes dashboard only; numeric local history."""
+    try:
+        return history_store.overview(days=days)
+    except (OSError, ValueError, RuntimeError):
+        return {"status": "history_unavailable", "api": {}, "vibe": {}}
