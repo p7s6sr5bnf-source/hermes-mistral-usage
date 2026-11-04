@@ -3,13 +3,14 @@
 A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
 Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
 
-> **Status: V0.2 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
+> **Status: V0.2.1 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
 
 ## Install (from repository)
 
 In Hermes Desktop, use **Capabilities → Plugins → Install from Git** and enter
-`p7s6sr5bnf-source/hermes-mistral-usage`. The GitHub connection must have
-permission to access this **private** repository.
+`p7s6sr5bnf-source/hermes-mistral-usage`. If the repository is private, the Hermes environment must already have
+GitHub access. If the owner switches it to public, no GitHub credentials
+should be required to clone.
 
 Alternatively on a machine with GitHub access:
 
@@ -19,8 +20,9 @@ hermes plugins install p7s6sr5bnf-source/hermes-mistral-usage --enable
 
 Enable **Desktop** separately in **Capabilities → Plugins**, then open the
 **Mistral Usage** sidebar tab. Hermes >= 0.21.2 is required.
-For testing the feature branch directly, clone it and install it as a local
-plugin directory. Do **not** use the main branch until the PR is merged.
+For manual/offline installation, follow the official Hermes documentation for
+local package discovery (the CLI command `hermes plugins install .` does not
+accept local paths).
 
 ## Configure the Mistral web session (on each backend host)
 
@@ -28,11 +30,10 @@ No API key can fetch these subscriber-level metrics. The plugin uses the
 authenticated **web Cookie header** for Mistral Console/Admin. **Never paste
 your cookie into chat, GitHub, Hermes agent prompts, a URL or a shell command.**
 
-1. Log in to Mistral Console in your own browser.
-2. In browser Developer Tools → Network, inspect an authenticated request to
-   `console.mistral.ai` or `admin.mistral.ai`; copy the **Cookie request header**
-   using local clipboard only. Be aware some cookies may be host-specific:
-   successful access to both endpoints is not guaranteed.
+1. Log in to **Mistral Admin** in your own browser.
+2. In browser Developer Tools → Network, select the authenticated
+   `billing.budget` request to `admin.mistral.ai` and copy its **Cookie request header**
+   using local clipboard only. Do not send a screenshot showing the header.
 3. On the **machine running the Hermes backend**, execute:
    ```bash
    python3 scripts/configure.py
@@ -40,7 +41,8 @@ your cookie into chat, GitHub, Hermes agent prompts, a URL or a shell command.**
    and paste the cookie at the hidden prompt. This creates
    `~/.config/hermes-mistral-usage/session.cookie` with mode 0600. If you
    install on Linux and macOS independently, configure the session **separately**
-   on both machines.
+   on each trusted backend machine. The cookie is a privileged browser session
+   credential, not a read-only scoped API token.
 4. The observed `billing.budget` URL is already embedded in the plugin. No URL environment variable is required.
 5. Restart/reload the Hermes backend if necessary, and enable the plugin in
    Hermes Desktop. The view refreshes automatically every 5 minutes.
@@ -67,12 +69,26 @@ The plugin does not claim per-key consumption.
 
 ## Privacy / security
 
+**Making this GitHub repository public does not make your cookie public.**
+The repository contains no authentic session data. Before changing visibility,
+scan all historical commits and branches for accidentally committed secrets.
+Any previously leaked session must be revoked; adding .gitignore does not
+remove secrets from Git history.
+
+
 - Backend reads a private local cookie; Desktop renderer receives only
   aggregate numeric data and sanitized error text.
 - No cookies, API keys, conversations or prompts are stored in GitHub.
 - Outbound requests go only to Mistral's fixed HTTPS hosts.
 - Redirects are disabled for credential-bearing requests.
-- The cookie file must be regular, owned by the current user, and mode 0600.
+- The cookie file must be regular, owned by the current user, mode 0600,
+  and not a symlink or hard-linked file. It is **not encrypted at rest**.
+- An attacker with the backend process's user permissions can read this
+  cookie and potentially impersonate the Mistral browser session.
+- The plugin cannot renew the cookie automatically; expiration and 302
+  redirects require a fresh locally supplied browser session.
+- Prefer running this on a dedicated, trusted machine and **not** on a
+  multi-tenant or publicly reachable Hermes backend.
 - Do not enable the backend route on an unauthenticated publicly accessible
   Hermes dashboard. Hermes must enforce authentication for plugin API endpoints.
 - This is a **web-session integration**, not an official Mistral API. Expiration,
