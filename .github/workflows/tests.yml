@@ -1,7 +1,7 @@
 name: Plugin checks
 on:
   push:
-    branches: [feat/initial-mistral-usage]
+    branches: [main]
   pull_request:
     branches: [main]
 permissions:
