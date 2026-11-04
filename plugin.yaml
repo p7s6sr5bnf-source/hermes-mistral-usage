@@ -1,0 +1,9 @@
+manifest_version: 1
+name: hermes-mistral-usage
+version: "0.1.0"
+description: Read-only Mistral Vibe quota and API billing monitor for Hermes Desktop.
+author: p7s6sr5bnf-source
+license: MIT
+homepage: https://github.com/p7s6sr5bnf-source/hermes-mistral-usage
+requires_hermes: ">=0.21.2"
+tags: [desktop, mistral, usage, monitoring]
