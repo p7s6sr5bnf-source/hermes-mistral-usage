@@ -176,7 +176,7 @@ def _insight(rows, now=None):
         if 0 < gap <= 12 and delta >= 0:
             deltas.append((nxt["observed_at"], delta))
     anomaly = None
-    if len(deltas) >= 6:
+    if len(deltas) >= 6 and deltas[-1][0] == rows[-1]['observed_at']:
         baseline = [d for _, d in deltas[:-1]]
         current_delta = deltas[-1][1]
         typical = statistics.median(baseline)
