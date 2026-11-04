@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from fastapi import APIRouter
@@ -176,6 +176,55 @@ def _result(fn, cookie):
         return {"ok": False, "error": "Unexpected Mistral response error."}
 
 
+def _budget_item(value):
+    if not isinstance(value, dict):
+        raise FetchError("Mistral subscription budget section missing.")
+    pct = value.get("usage_percentage")
+    amount = value.get("initial_budget")
+    currency = value.get("currency")
+    if (not isinstance(pct, (float, int)) or isinstance(pct, bool)
+            or not 0 <= pct <= 100 or not isinstance(amount, (int, float))
+            or isinstance(amount, bool) or amount <= 0
+            or currency not in ("EUR", "USD", "GBP", "CHF")):
+        raise FetchError("Mistral subscription budget fields invalid.")
+    return {
+        "ok": True, "used_percent": float(pct),
+        "remaining_percent": round(100 - float(pct), 6),
+        "initial_budget": float(amount),
+        "spent": round(float(amount) * float(pct) / 100, 6),
+        "remaining": round(float(amount) * (100 - float(pct)) / 100, 6),
+        "currency": currency, "reset_at": value.get("reset_at"),
+        "scope": "subscription", "source": "mistral-web-session",
+    }
+
+
+def _budget_url():
+    # The exact Request URL (including its input query) needs confirmation
+    # from the user's browser before we hardcode it. No arbitrary hosts.
+    value = os.environ.get("MISTRAL_SUBSCRIPTION_BUDGET_URL", "")
+    if not value:
+        raise FetchError("Set MISTRAL_SUBSCRIPTION_BUDGET_URL from DevTools Request URL.")
+    parts = urlsplit(value)
+    if (parts.scheme != "https" or parts.hostname != "admin.mistral.ai"
+            or parts.username or parts.password or parts.port
+            or not parts.path.endswith("/billing.budget")
+            or parts.fragment or len(value) > 4096):
+        raise FetchError("Subscription budget URL must be the Mistral Admin billing.budget request.")
+    return value
+
+
+def _subscription_budgets(cookie):
+    url = _budget_url()
+    response = _get_json(url, cookie, "https://admin.mistral.ai/", 15)
+    try:
+        data = response["result"]["data"]["json"]
+    except (KeyError, TypeError):
+        raise FetchError("Mistral subscription budget response schema changed.") from None
+    if not isinstance(data, dict):
+        raise FetchError("Mistral subscription budget response invalid.")
+    return _budget_item(data.get("api_budget")), _budget_item(data.get("vibe_budget"))
+
+
 def _collect():
     try:
         cookie = _read_cookie()
@@ -185,10 +234,16 @@ def _collect():
     if not cookie:
         return {"configured": False, "vibe": {"ok": False, "error": "Configure a Mistral session cookie."},
                 "api": {"ok": False, "error": "Configure a Mistral session cookie."}, "fetched_at": None}
+    try:
+        api, vibe = _subscription_budgets(cookie)
+    except FetchError as exc:
+        return {"configured": True, "vibe": {"ok": False, "error": str(exc)},
+                "api": {"ok": False, "error": str(exc)}, "fetched_at": None}
+    except Exception:
+        return {"configured": True, "vibe": {"ok": False, "error": "Unexpected subscription budget response."},
+                "api": {"ok": False, "error": "Unexpected subscription budget response."}, "fetched_at": None}
     return {
-        "configured": True,
-        "vibe": _result(_vibe, cookie),
-        "api": _result(_billing, cookie),
+        "configured": True, "vibe": vibe, "api": api,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
