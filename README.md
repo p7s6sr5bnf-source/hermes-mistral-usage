@@ -1,185 +1,164 @@
 # Hermes Mistral Usage
 
-A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
-Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
+[![Version](https://img.shields.io/badge/version-0.4.0-blue)](plugin.yaml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> **Status: V0.4.0 candidate pending cross-platform CI and real Hermes validation.** The subscription budget endpoint has been confirmed in a live Hermes screenshot; the new settings and notification flow still requires live cross-platform validation. The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
+A **read-only Mistral subscription quota monitor** for Hermes Desktop and Hermes Agent on Linux and macOS. It tracks the included **Vibe Code** and **API** budgets using Mistral's authenticated browser endpoint.
 
-## Install (from repository)
+The plugin does **not** use a model, change billing settings, switch providers, or spend API credits.
 
-In Hermes Desktop, use **Capabilities → Plugins → Install from Git** and enter
-`p7s6sr5bnf-source/hermes-mistral-usage`. If the repository is private, the Hermes environment must already have
-GitHub access. If the owner switches it to public, no GitHub credentials
-should be required to clone.
+> **Compatibility:** Hermes >= 0.21.2. Mistral's `billing.budget` endpoint is undocumented and can change without notice. Real-world compatibility depends on the installed Hermes version and an active Mistral web session. Linux CI has passed; Desktop/Agent integration and macOS should be verified on the target installation.
 
-Alternatively on a machine with GitHub access:
+## Features
+
+| Feature | Hermes Desktop | Hermes Agent |
+| --- | --- | --- |
+| Vibe Code / API subscription usage | Live budget readout | Latest saved observation |
+| Used or remaining balance, percent or currency | Configurable | Numeric values |
+| Status bar, green / amber / red thresholds | Yes | — |
+| Local historical observations and daily charts | 7 / 30 / 90-day selection | Local history summary |
+| Renewal date and daily budget allowance | Yes | Yes |
+| Conservative exhaustion projection | Yes | Yes |
+| Unusual consumption detection | Native alert when enabled | Read-only anomaly result |
+| Account changes or automatic model switching | **No** | **No** |
+
+The included API and Vibe budgets are separate from **pay-as-you-go** usage. No per-key consumption is available.
+
+## Installation
+
+### Hermes Desktop
+
+1. Open **Capabilities → Plugins → Install from Git**.
+2. Enter `p7s6sr5bnf-source/hermes-mistral-usage`.
+3. Enable the plugin's Desktop component.
+4. Open **Mistral Usage** from the sidebar. Its preferences are under **Settings → Plugins → Mistral Usage**.
+
+The Desktop view requests usage from the Hermes plugin API. A backend with a valid Mistral session must be configured for live readings.
+
+### Hermes Agent (CLI)
+
+Install in the **same Hermes environment and user profile that runs the Agent**:
 
 ```bash
 hermes plugins install p7s6sr5bnf-source/hermes-mistral-usage --enable
 ```
 
-Enable **Desktop** separately in **Capabilities → Plugins**, then open the
-**Mistral Usage** sidebar tab. Hermes >= 0.21.2 is required.
-For manual/offline installation, follow the official Hermes documentation for
-local package discovery (the CLI command `hermes plugins install .` does not
-accept local paths).
+To update an existing installation:
 
-## Configure the Mistral web session (on each backend host)
+```bash
+hermes plugins update hermes-mistral-usage
+hermes plugins enable hermes-mistral-usage
+```
 
-No API key can fetch these subscriber-level metrics. The plugin uses the
-authenticated **web Cookie header** for Mistral Console/Admin. **Never paste
-your cookie into chat, GitHub, Hermes agent prompts, a URL or a shell command.**
+Check registration:
 
-1. Log in to **Mistral Admin** in your own browser.
-2. In browser Developer Tools → Network, select the authenticated
-   `billing.budget` request to `admin.mistral.ai` and copy its **Cookie request header**
-   using local clipboard only. Do not send a screenshot showing the header.
-3. On the **machine running the Hermes backend**, execute:
+```bash
+hermes plugins list
+hermes plugins doctor hermes-mistral-usage
+```
+
+Restart the Hermes Agent/Gateway process after enabling the Python component. A new CLI session can then call **`mistral_usage_status`** (optional `days` argument: integer from 1 to 90, default 30).
+
+Example prompt:
+
+> Use the mistral_usage_status tool to summarize my latest saved Mistral API and Vibe Code usage, renewal date, daily allowance, and any available forecast.
+
+**Important:** The Agent tool does **not** log in to Mistral, read cookies, or fetch live balances. It reads only the local history written by a configured backend. Installing only the CLI tool does not create or populate this history. The tool may report no data until a successful fresh backend collection occurs.
+
+If separate Hermes processes must access the same history, they must point to the same **trusted local data directory**; otherwise, histories remain independent. No shared storage or additional infrastructure is required for a single Hermes installation.
+
+## Configure the Mistral session
+
+No documented scoped API credential exposes the subscription's `billing.budget` values. The current implementation uses an authenticated **browser session cookie**, which can grant account-level access and must be treated as a secret.
+
+1. Sign in to [Mistral Admin](https://admin.mistral.ai/).
+2. In your browser's developer tools, open **Network**, filter for `billing.budget`, and select a successful request to `admin.mistral.ai`.
+3. Under **Request Headers**, copy the **complete value of the `Cookie` header**. Do **not** copy the `Set-Cookie` response header or send a HAR/cURL capture to anyone.
+4. Run the helper **locally on the trusted backend host** from the cloned repository or installed plugin directory:
+
    ```bash
    python3 scripts/configure.py
    ```
-   and paste the cookie at the hidden prompt. This creates
-   `~/.config/hermes-mistral-usage/session.cookie` with mode 0600. If you
-   install on Linux and macOS independently, configure the session **separately**
-   on each trusted backend machine. The cookie is a privileged browser session
-   credential, not a read-only scoped API token.
-4. The observed `billing.budget` URL is already embedded in the plugin. No URL environment variable is required.
-5. Restart/reload the Hermes backend if necessary, and enable the plugin in
-   Hermes Desktop. The view refreshes automatically every 5 minutes.
 
-For deployment without the helper script, supply `MISTRAL_USAGE_COOKIE` as an
-environment variable **only to the trusted backend process**, or specify the
-`MISTRAL_USAGE_COOKIE_FILE` path to an owner-only regular file. Environment
-variables can be exposed to local process administrators; prefer the file.
+5. Paste the cookie at the hidden prompt. Restart the backend if necessary, then refresh Mistral Usage.
 
-## V0.4 — Local history and forecasting
+The helper saves `~/.config/hermes-mistral-usage/session.cookie` with owner-only permissions (`0600`). The cookie stays local; it is neither committed to Git nor passed to the Desktop renderer or Agent tool. It is **not encrypted at rest**.
 
-The backend stores only validated aggregate quota observations (percentage,
-budget, monetary amount, currency, reset date and observation timestamp) in
-`$HERMES_HOME/plugin-data/hermes-mistral-usage/usage.sqlite3`. Its directory is
-owner-only; the database is mode 0600. No cookies, headers, API keys, prompts,
-conversation content, account IDs or device identifiers are stored. The data
-survives plugin source updates and is never committed to Git. Data older than
-400 days is pruned automatically on subsequent successful writes.
+Alternative settings for the backend process:
 
-**Desktop:** after at least two days of observations, the Mistral Usage page
-shows daily usage charts, with a configurable 7, 30 or 90-day window. The remaining daily allowance is based on the reset
-time and unspent budget. The seven-day linear depletion projection requires
-three distinct observation days and at least 24 hours; the forecast is an
-estimate, not a guarantee. Periods are isolated by the returned `reset_at`.
-Anomaly detection needs at least six consecutive nonnegative increments within
-12-hour observation gaps. A suspicious increase (at least 0.5 percentage
-points and at least 3x the median prior increment) triggers an OS notification
-once per metric and observation, if enabled. These notifications are generated
-only while Hermes Desktop is active, not in the background as a server-side job.
+| Variable | Purpose |
+| --- | --- |
+| `MISTRAL_USAGE_COOKIE_FILE` | Path to a trusted owner-only cookie file |
+| `MISTRAL_USAGE_COOKIE` | Cookie supplied as an environment variable (less desirable: may be visible to process administrators) |
+| `HERMES_HOME` | Hermes home directory used for the default history path |
+| `HERMES_MISTRAL_DATA_DIR` | Optional directory containing the history database |
 
-**Hermes Agent:** `mistral_usage_status` is a strictly read-only tool, available
-to the running Agent after plugin registration/restart. It reads local SQLite
-history, reports quotas, forecasts, reset countdown, daily allowance and
-anomaly summaries. It does **not** read the Mistral cookie, call Mistral, modify
-an account, or automatically switch models. The Agent and Dashboard backend
-must share `HERMES_HOME` or the explicitly configured `HERMES_MISTRAL_DATA_DIR`
-to see the same database.
+These variables do not belong in the public repository. Do not put credentials in issues, pull requests, agent prompts, logs, screenshots, or shell arguments.
 
-**Important:** A database on your Linux host is independent of the database
-on your Mac or on a remote Hermes backend. This version never silently
-combines snapshots from two independent installations. On first launch
-history is empty, and forecasts appear only after enough valid observations.
+**Session expiration:** the plugin does not auto-renew sessions. A redirect or unauthorized response can mean the browser session expired or was revoked. Retrieve a fresh cookie locally if needed.
 
-### Tests and safety
+## Monitoring and preferences
 
-Run `python3 -m unittest discover -s tests -v` and
-`hermes plugins doctor hermes-mistral-usage` after installing. No live
-Mistral credentials are required by the test suite.
+Under **Settings → Plugins → Mistral Usage**, configure:
 
-## Desktop display and settings (v0.3.0)
+- Display **used** (default) or **remaining** balance.
+- Display a **percentage** (default) or the subscription currency amount.
+- Show or hide the Vibe and API indicators.
+- Enable/disable status colors. Green = normal; amber = at least 80% of the alert threshold; red = at or above the threshold.
+- Set independent Vibe/API thresholds (1–100% **used**, default 80%).
+- Enable/disable native OS notifications and anomalous-use alerts.
+- Select a 7-, 30-, or 90-day history window, and a 5-, 10-, 15-, or 30-minute Desktop polling interval.
 
-After installation, navigate to **Settings → Plugins → Mistral Usage**.
-The status-bar chip and the Mistral Usage page use the same preferences:
+The backend caches normal reads for 5 minutes and applies a 30-second minimum interval to manual refreshes. Notifications are deduplicated per event and are generated only while the Desktop plugin is running and notifications are allowed by the OS. Preferences are stored locally by Hermes Desktop.
 
-- Used (default) or remaining quota, independently selectable from unit.
-- Percentage (default) or amount in the subscription currency (EUR when returned by Mistral).
-- Show/hide the Vibe and API metrics independently.
-- Theme-aware green/amber/red states; green when below 80% of the configured alert threshold,
-  amber when nearing the threshold, red when the configured **percentage used** is reached.
-- Separate Vibe and API alert thresholds, 1–100% used (80% by default).
-- Native OS notifications (Linux/macOS), enabled by default. Deduplicated using each
-  metric's reset date and threshold, persisted in Hermes Desktop's plugin storage.
-- Graph history interval: 7, 30 or 90 days, with a default of 30 days.
-- Poll interval: 5, 10, 15, or 30 minutes; the backend enforces a 5-minute normal
-  cache and a minimum 30-second interval for manual refresh.
-- Reset preferences button. Preference changes immediately update the status bar and page.
+## History, forecasts, and data retention
 
-Preferences and notification history are stored by **Hermes Desktop**, not in the backend
-or GitHub. Thus Linux and macOS installations may have separate display preferences,
-even when they query the same Hermes backend. Alerts are only evaluated while
-Hermes Desktop is running and the plugin is enabled; the plugin is **not a scheduled
-server-side watchdog**. Notifications require OS permission and may be restricted
-by focus/do-not-disturb modes. An existing over-threshold value triggers one alert
-on the first successful poll after installing/configuring; subsequent polls are
-deduplicated for the same metric/reset date/threshold.
+Successful **fresh** authenticated backend reads append numeric observations to:
 
-## UI and monitoring
+```text
+$HERMES_HOME/plugin-data/hermes-mistral-usage/usage.sqlite3
+```
 
-- Vibe Code: included budget, used / remaining percentages and reset time.
-- API: included budget, used / remaining percentages and reset time.
-- Both derive from the same subscription budget response; an endpoint failure makes both unavailable.
-- Pay-as-you-go is deliberately excluded; no per-key consumption is claimed.
-- Status bar: Vibe and API in configured used/remaining and %/currency units.
-- Automatic refresh every five minutes. Shared cache TTL = 300 s; manual
-  refresh observes a minimum 30 s interval.
-- Timestamps for last successful poll; distinct error and cached states.
+The default Hermes home is `~/.hermes`. Alternatively, set `HERMES_MISTRAL_DATA_DIR` to a dedicated local directory. History is stored outside the plugin's installation tree, so plugin updates do not delete it. Database permissions are restricted to the owning user; records older than 400 days are pruned on subsequent writes.
 
-**Scope:** this is an organization/subscription view. Two API keys in one
-organization do not necessarily correspond to two separately reported budgets.
-The plugin does not claim per-key consumption.
+The database contains **only** observation timestamps, metric names, renewal timestamps, percentages, currency, and aggregate monetary amounts. It contains **no** cookies, tokens, prompts, conversations, or account identifiers.
 
-## Privacy / security
+**How the 7/30/90-day selector works:** it selects the *maximum lookback window for recorded observations*, **not** a request for historical data from Mistral. The current implementation plots the latest subscription cycle only; previous renewal cycles are not stitched into the current chart. The plugin cannot reconstruct earlier readings that were never recorded.
 
-**Making this GitHub repository public does not make your cookie public.**
-The repository contains no authentic session data. Before changing visibility,
-scan all historical commits and branches for accidentally committed secrets.
-Any previously leaked session must be revoked; adding .gitignore does not
-remove secrets from Git history.
+**Forecasts:** the remaining daily allowance is the current unspent budget divided by the time left until renewal. A seven-day linear extrapolation requires at least three distinct days of observations spanning 24 hours. A forecast is only shown when the extrapolated exhaustion precedes renewal; it is an estimate, not a promise.
 
+**Anomalies:** detection needs at least six consecutive valid increases within 12-hour sample gaps. The most recent increase must be at least 0.5 percentage points and at least three times the median of the previous increments. Low-frequency sampling can miss short spikes. Notifications are not a server-side background monitor.
 
-- Backend reads a private local cookie; Desktop renderer receives only
-  aggregate numeric data and sanitized error text.
-- No cookies, API keys, conversations or prompts are stored in GitHub.
-- Outbound requests go only to Mistral's fixed HTTPS hosts.
-- Redirects are disabled for credential-bearing requests.
-- The cookie file must be regular, owned by the current user, mode 0600,
-  and not a symlink or hard-linked file. It is **not encrypted at rest**.
-- An attacker with the backend process's user permissions can read this
-  cookie and potentially impersonate the Mistral browser session.
-- The plugin cannot renew the cookie automatically; expiration and 302
-  redirects require a fresh locally supplied browser session.
-- Prefer running this on a dedicated, trusted machine and **not** on a
-  multi-tenant or publicly reachable Hermes backend.
-- Do not enable the backend route on an unauthenticated publicly accessible
-  Hermes dashboard. Hermes must enforce authentication for plugin API endpoints.
-- This is a **web-session integration**, not an official Mistral API. Expiration,
-  revocation, CSRF rules and endpoint schema may change.
+**Agent privacy:** when an Agent invokes `mistral_usage_status`, the resulting aggregate figures can be sent to the model provider serving the conversation. The cookie itself is never read by that tool.
 
-## Development / checks
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| `302` / redirect or unauthorized | The session cookie may have expired, been revoked, or be for a different scope. Repeat the local configuration using the exact `billing.budget` request. |
+| Desktop says backend unavailable | Verify the Hermes backend/profile is reachable and the plugin backend is enabled; restart/reload it. |
+| Agent cannot find `mistral_usage_status` | Verify the plugin is enabled in the Agent's own environment and restart the process. |
+| Agent returns `no_history` | It reads saved data only. Check that a fresh authenticated backend collection occurred and both processes can access the same history directory. |
+| Graph shows no line | Initial readings may be missing or only one day is recorded. The selector does not backfill previous months. |
+| No native notification | Check the threshold, notification preference, Desktop runtime, and OS notification permissions. |
+| History unavailable | Check the history directory's existence, owner, `0700` directory permissions, and `0600` SQLite file permissions. |
+
+## Development
+
+Run from the repository root:
 
 ```bash
+python3 -m pip install fastapi
 python3 -m unittest discover -s tests -v
-python3 -m py_compile dashboard/plugin_api.py
+python3 -m py_compile dashboard/plugin_api.py usage_history.py __init__.py scripts/configure.py
 node --check desktop/plugin.js
 hermes plugins validate .
 ```
 
-The first three checks require Python with `fastapi` (usually supplied by
-Hermes) and Node.js; `hermes plugins validate` requires a compatible Hermes
-installation. Live authenticated testing must be performed locally; CI must
-never have a production web-session cookie.
+The tests use synthetic account data and do not contact Mistral or require credentials. GitHub Actions checks are **manual-only** (`workflow_dispatch`) while integration is being validated; this does not constitute macOS certification.
 
-## Confirmed subscription schema
+## Security, contributions and licensing
 
-`billing.budget` returns `result.data.json.api_budget` and `vibe_budget`, each with `usage_percentage`, `initial_budget`, `currency` and `reset_at`. The top-level percentage is **not** a third independent budget. The `billing.usageLimits` response represents Pay-as-you-go and is not used.
+Read [SECURITY.md](SECURITY.md) before reporting an issue. Use synthetic or redacted diagnostic information, and **never disclose a live browser session**.
 
-## Origins
-
-The endpoint approach was identified in
-[UsageBar](https://github.com/lfmundim/UsageBar). See [THIRD_PARTY.md](THIRD_PARTY.md).
+This is an independent, MIT-licensed project; see [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. It is **unofficial** and is not endorsed by Mistral or Hermes.
