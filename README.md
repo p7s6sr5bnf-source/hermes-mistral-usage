@@ -3,7 +3,7 @@
 A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
 Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
 
-> **Status: V0.3.0 candidate.** The subscription budget endpoint has been confirmed in a live Hermes screenshot; the new settings and notification flow still requires live cross-platform validation. The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
+> **Status: V0.4.0 candidate pending cross-platform CI and real Hermes validation.** The subscription budget endpoint has been confirmed in a live Hermes screenshot; the new settings and notification flow still requires live cross-platform validation. The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
 
 ## Install (from repository)
 
@@ -52,6 +52,46 @@ environment variable **only to the trusted backend process**, or specify the
 `MISTRAL_USAGE_COOKIE_FILE` path to an owner-only regular file. Environment
 variables can be exposed to local process administrators; prefer the file.
 
+## V0.4 — Local history and forecasting
+
+The backend stores only validated aggregate quota observations (percentage,
+budget, monetary amount, currency, reset date and observation timestamp) in
+`$HERMES_HOME/plugin-data/hermes-mistral-usage/usage.sqlite3`. Its directory is
+owner-only; the database is mode 0600. No cookies, headers, API keys, prompts,
+conversation content, account IDs or device identifiers are stored. The data
+survives plugin source updates and is never committed to Git. Data older than
+400 days is pruned automatically on subsequent successful writes.
+
+**Desktop:** after at least two days of observations, the Mistral Usage page
+shows daily usage charts, with a configurable 7, 30 or 90-day window. The remaining daily allowance is based on the reset
+time and unspent budget. The seven-day linear depletion projection requires
+three distinct observation days and at least 24 hours; the forecast is an
+estimate, not a guarantee. Periods are isolated by the returned `reset_at`.
+Anomaly detection needs at least six consecutive nonnegative increments within
+12-hour observation gaps. A suspicious increase (at least 0.5 percentage
+points and at least 3x the median prior increment) triggers an OS notification
+once per metric and observation, if enabled. These notifications are generated
+only while Hermes Desktop is active, not in the background as a server-side job.
+
+**Hermes Agent:** `mistral_usage_status` is a strictly read-only tool, available
+to the running Agent after plugin registration/restart. It reads local SQLite
+history, reports quotas, forecasts, reset countdown, daily allowance and
+anomaly summaries. It does **not** read the Mistral cookie, call Mistral, modify
+an account, or automatically switch models. The Agent and Dashboard backend
+must share `HERMES_HOME` or the explicitly configured `HERMES_MISTRAL_DATA_DIR`
+to see the same database.
+
+**Important:** A database on your Linux host is independent of the database
+on your Mac or on a remote Hermes backend. This version never silently
+combines snapshots from two independent installations. On first launch
+history is empty, and forecasts appear only after enough valid observations.
+
+### Tests and safety
+
+Run `python3 -m unittest discover -s tests -v` and
+`hermes plugins doctor hermes-mistral-usage` after installing. No live
+Mistral credentials are required by the test suite.
+
 ## Desktop display and settings (v0.3.0)
 
 After installation, navigate to **Settings → Plugins → Mistral Usage**.
@@ -65,6 +105,7 @@ The status-bar chip and the Mistral Usage page use the same preferences:
 - Separate Vibe and API alert thresholds, 1–100% used (80% by default).
 - Native OS notifications (Linux/macOS), enabled by default. Deduplicated using each
   metric's reset date and threshold, persisted in Hermes Desktop's plugin storage.
+- Graph history interval: 7, 30 or 90 days, with a default of 30 days.
 - Poll interval: 5, 10, 15, or 30 minutes; the backend enforces a 5-minute normal
   cache and a minimum 30-second interval for manual refresh.
 - Reset preferences button. Preference changes immediately update the status bar and page.
@@ -84,7 +125,7 @@ deduplicated for the same metric/reset date/threshold.
 - API: included budget, used / remaining percentages and reset time.
 - Both derive from the same subscription budget response; an endpoint failure makes both unavailable.
 - Pay-as-you-go is deliberately excluded; no per-key consumption is claimed.
-- Status bar: Vibe remaining percentage, or a dash if unavailable.
+- Status bar: Vibe and API in configured used/remaining and %/currency units.
 - Automatic refresh every five minutes. Shared cache TTL = 300 s; manual
   refresh observes a minimum 30 s interval.
 - Timestamps for last successful poll; distinct error and cached states.

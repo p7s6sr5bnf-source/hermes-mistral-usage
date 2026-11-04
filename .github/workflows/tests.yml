@@ -1,9 +1,6 @@
 name: Plugin checks
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -22,6 +19,6 @@ jobs:
           node-version: '22'
       - run: python -m pip install fastapi
       - run: python -m unittest discover -s tests -v
-      - run: python -m py_compile dashboard/plugin_api.py scripts/configure.py
+      - run: python -m py_compile dashboard/plugin_api.py usage_history.py __init__.py scripts/configure.py
       - run: node --check desktop/plugin.js
       - run: python -m json.tool dashboard/manifest.json

@@ -1,9 +1,12 @@
 manifest_version: 1
 name: hermes-mistral-usage
-version: "0.3.0"
-description: Configurable Mistral API and Vibe usage monitor with alerts and native Hermes Desktop settings.
+version: "0.4.0"
+description: Mistral quota monitoring with local history, projection, anomaly alerts and read-only Hermes Agent tool.
 author: p7s6sr5bnf-source
 license: MIT
 homepage: https://github.com/p7s6sr5bnf-source/hermes-mistral-usage
 requires_hermes: ">=0.21.2"
 tags: [desktop, mistral, usage, monitoring]
+
+provides_tools:
+  - mistral_usage_status

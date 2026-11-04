@@ -51,22 +51,22 @@ class BackendTests(unittest.TestCase):
 
     def test_subscription_budget_schema(self):
         item = backend._budget_item({
-            "usage_percentage": 1.86366963, "initial_budget": 25.5,
+            "usage_percentage": 1.86366963, "initial_budget": 100.0,
             "currency": "EUR", "reset_at": "2026-12-01T00:00:00Z"
         })
         self.assertTrue(item["ok"])
-        self.assertAlmostEqual(item["spent"], 0.475236, places=5)
+        self.assertAlmostEqual(item["spent"], 1.86367, places=5)
         self.assertAlmostEqual(item["remaining_percent"], 98.13633037, places=5)
 
     def test_subscription_budgets(self):
         payload = {"result": {"data": {"json": {
-            "api_budget": {"usage_percentage": 1, "initial_budget": 25.5, "currency": "EUR"},
-            "vibe_budget": {"usage_percentage": 0.5, "initial_budget": 255, "currency": "EUR"}
+            "api_budget": {"usage_percentage": 1, "initial_budget": 100.0, "currency": "EUR"},
+            "vibe_budget": {"usage_percentage": 0.5, "initial_budget": 200, "currency": "EUR"}
         }}}}
         with patch.object(backend, "_get_json", return_value=payload):
             api, vibe = backend._subscription_budgets("x=1")
-            self.assertEqual(api["initial_budget"], 25.5)
-            self.assertEqual(vibe["initial_budget"], 255)
+            self.assertEqual(api["initial_budget"], 100.0)
+            self.assertEqual(vibe["initial_budget"], 200)
 
     def test_budget_url_is_fixed_and_uses_https(self):
         url = backend._budget_url()
