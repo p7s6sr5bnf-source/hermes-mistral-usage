@@ -119,13 +119,13 @@ def record(snapshot):
 
 def _rows(con, name, cycle, days=30):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    return [dict(x) for x in con.execute(
+    return list(reversed([dict(x) for x in con.execute(
         """SELECT observed_at, metric, cycle, used_pct, budget, spent, currency
            FROM observations
            WHERE metric=? AND cycle=? AND observed_at>=?
-           ORDER BY observed_at ASC LIMIT 5000""",
+           ORDER BY observed_at DESC LIMIT 12000""",
         (name, cycle, cutoff)
-    )]
+    )]))
 
 
 def _insight(rows, now=None):
