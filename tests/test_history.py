@@ -18,7 +18,7 @@ def snapshot(time, used_api=4, used_vibe=2, cycle=None):
     return {
         "fetched_at": time.isoformat(),
         "api": {"ok": True, "used_percent": used_api, "initial_budget": 100.0,
-                "spent": 25.5*used_api/100, "currency": "EUR", "reset_at": cycle},
+                "spent": 100.0*used_api/100, "currency": "EUR", "reset_at": cycle},
         "vibe": {"ok": True, "used_percent": used_vibe, "initial_budget": 200.0,
                  "spent": 200*used_vibe/100, "currency": "EUR", "reset_at": cycle},
     }
