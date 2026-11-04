@@ -68,16 +68,16 @@ class BackendTests(unittest.TestCase):
             "api_budget": {"usage_percentage": 1, "initial_budget": 25.5, "currency": "EUR"},
             "vibe_budget": {"usage_percentage": 0.5, "initial_budget": 255, "currency": "EUR"}
         }}}}
-        with patch.dict(os.environ, {"MISTRAL_SUBSCRIPTION_BUDGET_URL": "https://admin.mistral.ai/api/trpc/billing.budget?input=test"}):
-            with patch.object(backend, "_get_json", return_value=payload):
-                api, vibe = backend._subscription_budgets("x=1")
-                self.assertEqual(api["initial_budget"], 25.5)
-                self.assertEqual(vibe["initial_budget"], 255)
+        with patch.object(backend, "_get_json", return_value=payload):
+            api, vibe = backend._subscription_budgets("x=1")
+            self.assertEqual(api["initial_budget"], 25.5)
+            self.assertEqual(vibe["initial_budget"], 255)
 
-    def test_reject_untrusted_host(self):
-        with patch.dict(os.environ, {"MISTRAL_SUBSCRIPTION_BUDGET_URL": "https://evil.example/api/trpc/billing.budget"}):
-            with self.assertRaises(backend.FetchError):
-                backend._budget_url()
+    def test_budget_url_is_fixed_and_uses_https(self):
+        url = backend._budget_url()
+        self.assertTrue(url.startswith("https://admin.mistral.ai/api/local-trpc/billing.budget?input="))
+        with patch.dict(os.environ, {"MISTRAL_SUBSCRIPTION_BUDGET_URL": "https://evil.example/"}):
+            self.assertEqual(backend._budget_url(), url)
 
 
 if __name__ == "__main__":
