@@ -3,7 +3,7 @@
 A standalone **Hermes Agent + Hermes Desktop** plugin for **Linux and macOS**.
 Native sidebar page and status-bar chip display the **included Mistral subscription budgets** for API and Vibe Code, using `billing.budget`. No token estimates, no LLM calls, no changes to configured model providers.
 
-> **Status: V0.2.1 candidate, not yet tested against a real Mistral account.** The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
+> **Status: V0.3.0 candidate.** The subscription budget endpoint has been confirmed in a live Hermes screenshot; the new settings and notification flow still requires live cross-platform validation. The response mapping is supported by a redacted live account example. The exact billing.budget Request URL was confirmed from browser DevTools; this remains an unofficial endpoint.
 
 ## Install (from repository)
 
@@ -51,6 +51,32 @@ For deployment without the helper script, supply `MISTRAL_USAGE_COOKIE` as an
 environment variable **only to the trusted backend process**, or specify the
 `MISTRAL_USAGE_COOKIE_FILE` path to an owner-only regular file. Environment
 variables can be exposed to local process administrators; prefer the file.
+
+## Desktop display and settings (v0.3.0)
+
+After installation, navigate to **Settings → Plugins → Mistral Usage**.
+The status-bar chip and the Mistral Usage page use the same preferences:
+
+- Used (default) or remaining quota, independently selectable from unit.
+- Percentage (default) or amount in the subscription currency (EUR when returned by Mistral).
+- Show/hide the Vibe and API metrics independently.
+- Theme-aware green/amber/red states; green when below 80% of the configured alert threshold,
+  amber when nearing the threshold, red when the configured **percentage used** is reached.
+- Separate Vibe and API alert thresholds, 1–100% used (80% by default).
+- Native OS notifications (Linux/macOS), enabled by default. Deduplicated using each
+  metric's reset date and threshold, persisted in Hermes Desktop's plugin storage.
+- Poll interval: 5, 10, 15, or 30 minutes; the backend enforces a 5-minute normal
+  cache and a minimum 30-second interval for manual refresh.
+- Reset preferences button. Preference changes immediately update the status bar and page.
+
+Preferences and notification history are stored by **Hermes Desktop**, not in the backend
+or GitHub. Thus Linux and macOS installations may have separate display preferences,
+even when they query the same Hermes backend. Alerts are only evaluated while
+Hermes Desktop is running and the plugin is enabled; the plugin is **not a scheduled
+server-side watchdog**. Notifications require OS permission and may be restricted
+by focus/do-not-disturb modes. An existing over-threshold value triggers one alert
+on the first successful poll after installing/configuring; subsequent polls are
+deduplicated for the same metric/reset date/threshold.
 
 ## UI and monitoring
 
