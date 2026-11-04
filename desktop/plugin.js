@@ -11,6 +11,7 @@ const DEFAULTS = Object.freeze({
   thresholdVibe: 80,
   thresholdApi: 80,
   notifications: true,
+  anomalyAlerts: true,
   colors: true,
   pollMinutes: 5
 })
@@ -21,7 +22,7 @@ function normalized(raw) {
   const s = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) }
   if (!['used', 'remaining'].includes(s.display)) s.display = DEFAULTS.display
   if (!['percent', 'eur'].includes(s.units)) s.units = DEFAULTS.units
-  for (const key of ['showVibe', 'showApi', 'notifications', 'colors']) s[key] = s[key] === true
+  for (const key of ['showVibe', 'showApi', 'notifications', 'anomalyAlerts', 'colors']) s[key] = s[key] === true
   for (const key of ['thresholdVibe', 'thresholdApi']) {
     const n = Number(s[key])
     s[key] = Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : DEFAULTS[key]
@@ -61,6 +62,7 @@ function makeRuntime(ctx) {
     ctx,
     settings: normalized(ctx.storage.get('preferences', DEFAULTS)),
     data: null,
+    insights: null,
     error: '',
     loading: false,
     lastPoll: 0,
@@ -107,7 +109,28 @@ function makeRuntime(ctx) {
         host.notify({ kind: 'warning', message })
       }
     }
-    if (changed) ctx.storage.set('sentAlerts', state.sentAlerts)
+    if (state.settings.anomalyAlerts && state.settings.notifications) {
+      for (const id of ['api', 'vibe']) {
+        const item = state.insights?.[id]?.anomaly
+        if (!item || !item.at) continue
+        const key = 'spike:' + id + ':' + item.at
+        if (state.sentAlerts[key]) continue
+        state.sentAlerts[key] = true
+        changed = true
+        const message = (id === 'vibe' ? 'Vibe Code' : 'Mistral API') +
+          ' : hausse inhabituelle de ' + fmtNumber(item.delta_percent_points, 2) + ' points entre deux relevés.'
+        try {
+          const pending = ctx.os.notify({ title: 'Mistral — consommation anormale', body: message })
+          if (pending && typeof pending.catch === 'function') pending.catch(() => host.notify({ kind: 'warning', message }))
+        } catch { host.notify({ kind: 'warning', message }) }
+      }
+    }
+    if (changed) {
+      const entries = Object.entries(state.sentAlerts)
+      // Keep notifications bounded across subscription cycles.
+      if (entries.length > 200) state.sentAlerts = Object.fromEntries(entries.slice(-120))
+      ctx.storage.set('sentAlerts', state.sentAlerts)
+    }
   }
   state.refresh = async (force = false) => {
     if (state.inFlight) return state.inFlight
@@ -120,7 +143,12 @@ function makeRuntime(ctx) {
         state.data = next
         state.error = ''
         state.lastPoll = Date.now()
-        state.checkAlerts()
+        try {
+          state.insights = await ctx.rest('/insights?days=30')
+        } catch {
+          state.insights = null
+        }
+        if (!state.disposed) state.checkAlerts()
       } catch {
         if (!state.disposed) {
           state.error = 'Backend Hermes indisponible — vérifie le plugin et le profil courant.'
@@ -175,6 +203,61 @@ function Metric({ title, metric, threshold, s }) {
   })
 }
 
+function TrendChart({ points, label }) {
+  const list = Array.isArray(points) ? points : []
+  if (list.length < 2) return jsx('p', {
+    className: 'text-xs text-(--ui-text-tertiary)',
+    children: 'Le graphique apparaîtra après plusieurs journées de relevés.'
+  })
+  const values = list.slice(-30)
+  const width = 680
+  const height = 150
+  const pad = 20
+  const max = Math.max(1, ...values.map(v => Number(v.used_percent) || 0))
+  const coords = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (width - 2 * pad)
+    const y = height - pad - (Number(v.used_percent) || 0) / max * (height - 2 * pad)
+    return x.toFixed(1) + ',' + y.toFixed(1)
+  }).join(' ')
+  return jsxs('div', { className: 'flex flex-col gap-1', children: [
+    jsx('svg', { viewBox: '0 0 680 150', role: 'img', 'aria-label': 'Historique ' + label + ' de consommation en pourcentage',
+      className: 'w-full max-h-44 text-(--ui-success)',
+      children: jsxs('g', { children: [
+        jsx('line', { x1: 20, y1: 130, x2: 660, y2: 130, stroke: 'currentColor', opacity: 0.25 }),
+        jsx('polyline', { fill: 'none', stroke: 'currentColor', strokeWidth: 3, strokeLinejoin: 'round',
+          strokeLinecap: 'round', points: coords })
+      ] })
+    }),
+    jsx('p', { className: 'text-xs text-(--ui-text-tertiary)',
+      children: values[0].day + ' → ' + values[values.length - 1].day +
+        ' · maximum ' + fmtNumber(max, 2) + ' % consommé' })
+  ] })
+}
+
+function InsightsCard({ id, label, item }) {
+  if (!item?.latest) return jsx('section', { className: 'rounded-lg border border-(--ui-stroke-secondary) p-3 text-xs text-(--ui-text-tertiary)',
+    children: label + ' : historique en attente de plusieurs relevés.' })
+  const currency = item.latest.currency || 'EUR'
+  const reset = item.latest.reset_at ? new Date(item.latest.reset_at).toLocaleString('fr-FR') : '—'
+  const projection = item.projected_exhaustion
+    ? 'Épuisement estimé : ' + new Date(item.projected_exhaustion).toLocaleDateString('fr-FR')
+    : 'Aucun épuisement prévisible avant renouvellement (ou historique insuffisant).'
+  return jsxs('section', { className: 'rounded-lg border border-(--ui-stroke-secondary) p-4 flex flex-col gap-2', children: [
+    jsx('h2', { className: 'text-sm font-semibold', children: label + ' — historique' }),
+    jsx(TrendChart, { points: item.chart, label }),
+    jsx('p', { className: 'text-xs', children: 'Renouvellement : ' + reset }),
+    jsx('p', { className: 'text-xs', children: item.daily_remaining_budget == null
+      ? 'Budget quotidien disponible : indisponible'
+      : 'Budget quotidien disponible : ' + fmtNumber(item.daily_remaining_budget, 2) + ' ' + currency + ' / jour' }),
+    jsx('p', { className: 'text-xs', children: projection }),
+    jsx('p', { className: 'text-xs text-(--ui-text-tertiary)', children:
+      item.daily_usage_rate_pct == null ? 'Projection : au moins 3 jours distincts et 24h d’historique requis.' :
+      'Tendance 7 jours : ' + fmtNumber(item.daily_usage_rate_pct, 2) + ' point(s) / jour (estimation).' }),
+    item.anomaly ? jsx('p', { className: 'text-xs text-(--ui-warning)', children:
+      'Hausse inhabituelle détectée : +' + fmtNumber(item.anomaly.delta_percent_points, 2) + ' points.' }) : null
+  ] })
+}
+
 function UsagePage() {
   const m = useMonitor()
   if (!m) return null
@@ -199,6 +282,9 @@ function UsagePage() {
       s.showVibe ? jsx(Metric, { title: 'Vibe Code', metric: data?.vibe, threshold: s.thresholdVibe, s }) : null,
       s.showApi ? jsx(Metric, { title: 'Mistral API', metric: data?.api, threshold: s.thresholdApi, s }) : null,
       !s.showVibe && !s.showApi ? jsx('p', { className: 'text-sm', children: 'Active au moins un indicateur dans les réglages.' }) : null,
+      jsx('h2', { className: 'font-semibold pt-2', children: 'Historique et projections' }),
+      s.showVibe ? jsx(InsightsCard, { id: 'vibe', label: 'Vibe Code', item: m.insights?.vibe }) : null,
+      s.showApi ? jsx(InsightsCard, { id: 'api', label: 'Mistral API', item: m.insights?.api }) : null,
       jsx('p', { className: 'text-xs text-(--ui-text-tertiary)', children: 'Dernière lecture : ' + fetched + (data?.cached ? ' · cache' : '') }),
       data?.configured === false ? jsx('p', { className: 'text-sm', children: 'Configure le cookie local avec scripts/configure.py.' }) : null
     ]
@@ -269,6 +355,8 @@ function SettingsPage() {
     jsx(CheckSetting, { label: 'Activer les couleurs de statut', checked: s.colors,
       change: v => set('colors', v), help: 'Vert : normal, orange : proche du seuil, rouge : seuil atteint.' }),
     jsx('h3', { className: 'font-semibold pt-2', children: 'Alertes' }),
+    jsx(CheckSetting, { label: 'Détecter les hausses anormales', checked: s.anomalyAlerts,
+      change: v => set('anomalyAlerts', v), help: 'Alerte si un incrément est nettement supérieur aux relevés précédents. Nécessite au moins 6 intervalles.' }),
     jsx(CheckSetting, { label: 'Notifications système', checked: s.notifications,
       change: v => set('notifications', v), help: 'Une notification par quota, seuil et période de renouvellement ; pas de spam au rafraîchissement.' }),
     ...[['thresholdVibe', 'Vibe Code'], ['thresholdApi', 'Mistral API']].map(([key, label]) =>
