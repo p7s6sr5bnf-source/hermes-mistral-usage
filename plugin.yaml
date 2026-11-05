@@ -1,6 +1,6 @@
 manifest_version: 1
 name: hermes-mistral-usage
-version: "0.4.0"
+version: "0.4.1"
 description: Mistral quota monitoring with local history, projection, anomaly alerts and read-only Hermes Agent tool.
 author: p7s6sr5bnf-source
 license: MIT
