@@ -1,6 +1,6 @@
 # Hermes Mistral Usage
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue)](plugin.yaml)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue)](plugin.yaml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A **read-only Mistral subscription quota monitor** for Hermes Desktop and Hermes Agent on Linux and macOS. It tracks the included **Vibe Code** and **API** budgets using Mistral's authenticated browser endpoint.
@@ -15,7 +15,7 @@ The plugin does **not** use a model, change billing settings, switch providers, 
 | --- | --- | --- |
 | Vibe Code / API subscription usage | Live budget readout | Latest saved observation |
 | Used or remaining balance, percent or currency | Configurable | Numeric values |
-| Status bar, green / amber / red thresholds | Yes | — |
+| Status bar, clickable quota details popover and adjustable thresholds | Yes | — |
 | Local historical observations and daily charts | 7 / 30 / 90-day selection | Local history summary |
 | Renewal date and daily budget allowance | Yes | Yes |
 | Conservative exhaustion projection | Yes | Yes |
@@ -31,7 +31,7 @@ The included API and Vibe budgets are separate from **pay-as-you-go** usage. No 
 1. Open **Capabilities → Plugins → Install from Git**.
 2. Enter `p7s6sr5bnf-source/hermes-mistral-usage`.
 3. Enable the plugin's Desktop component.
-4. Open **Mistral Usage** from the sidebar. Its preferences are under **Settings → Plugins → Mistral Usage**.
+4. Click the Mistral summary in the bottom status bar to open a compact popover. Its **Settings** button opens **Settings → Plugins → Mistral Usage**, and **View details** opens the full sidebar page.
 
 The Desktop view requests usage from the Hermes plugin API. A backend with a valid Mistral session must be configured for live readings.
 
@@ -98,6 +98,8 @@ These variables do not belong in the public repository. Do not put credentials i
 **Session expiration:** the plugin does not auto-renew sessions. A redirect or unauthorized response can mean the browser session expired or was revoked. Retrieve a fresh cookie locally if needed.
 
 ## Monitoring and preferences
+
+Clicking the **Mistral** status-bar summary opens a native Hermes popover above the bar. It shows each selected budget, consumed and remaining amounts, a small usage bar, renewal time, and the last successful read. The popover offers **View details**, **Settings** and **Refresh** without navigating away until you choose a destination. Clicking outside or pressing Escape closes it.
 
 Under **Settings → Plugins → Mistral Usage**, configure:
 
