@@ -1,4 +1,4 @@
-import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, pluginSettingsHref } from '@hermes/plugin-sdk'
+import { host, ROUTES_AREA, SIDEBAR_NAV_AREA, pluginSettingsHref, Popover, PopoverTrigger, PopoverContent } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useEffect, useState } from 'react'
 
@@ -299,28 +299,107 @@ function UsagePage() {
   })
 }
 
+function PopoverBudget({ label, metric, threshold, settings }) {
+  const pct = metric?.ok && Number.isFinite(metric.used_percent)
+    ? Math.max(0, Math.min(100, metric.used_percent)) : 0
+  const reset = metric?.reset_at
+    ? new Date(metric.reset_at).toLocaleString('fr-FR') : 'Indisponible'
+  return jsxs('section', {
+    className: 'rounded-md border border-(--ui-stroke-secondary) p-3 flex flex-col gap-2',
+    children: [
+      jsxs('div', { className: 'flex items-center justify-between gap-3', children: [
+        jsx('strong', { className: 'text-sm', children: label }),
+        jsx('span', { className: 'text-sm font-semibold ' + tone(metric, threshold, settings.colors),
+          children: formatValue(metric, settings) })
+      ] }),
+      metric?.ok ? jsxs('div', { className: 'flex flex-col gap-1.5', children: [
+        jsx('div', { className: 'h-1.5 rounded-full overflow-hidden bg-(--ui-stroke-secondary)',
+          children: jsx('div', {
+            className: 'h-full rounded-full ' + (settings.colors && pct >= threshold
+              ? 'bg-(--ui-danger)' : settings.colors && pct >= threshold * 0.8
+              ? 'bg-(--ui-warning)' : 'bg-(--ui-success)'),
+            style: { width: pct + '%' }
+          }) }),
+        jsx('p', { className: 'text-xs text-(--ui-text-tertiary)', children:
+          fmtNumber(metric.used_percent, 1) + ' % consommé · ' +
+          fmtNumber(metric.spent, 2) + ' / ' +
+          fmtNumber(metric.initial_budget, 2) + ' ' + metric.currency }),
+        jsx('p', { className: 'text-xs text-(--ui-text-tertiary)', children:
+          'Disponible : ' + fmtNumber(metric.remaining, 2) + ' ' + metric.currency }),
+        jsx('p', { className: 'text-xs text-(--ui-text-tertiary)', children:
+          'Renouvellement : ' + reset })
+      ] }) : jsx('p', { className: 'text-xs text-(--ui-danger)', children:
+        metric?.error || 'Données indisponibles' })
+    ]
+  })
+}
+
 function UsageChip() {
   const m = useMonitor()
+  const [open, setOpen] = useState(false)
   if (!m) return null
   const s = m.settings
   const items = [
-    s.showVibe && { id: 'vibe', label: 'Vibe', threshold: s.thresholdVibe },
-    s.showApi && { id: 'api', label: 'API', threshold: s.thresholdApi }
+    s.showVibe && { id: 'vibe', label: 'Vibe', title: 'Vibe Code', threshold: s.thresholdVibe },
+    s.showApi && { id: 'api', label: 'API', title: 'Mistral API', threshold: s.thresholdApi }
   ].filter(Boolean)
-  return jsxs('button', {
-    type: 'button',
-    title: 'Mistral · ' + (s.display === 'used' ? 'consommé' : 'restant') + ' · cliquer pour les détails',
-    onClick: () => host.navigate('/mistral-usage'),
-    className: 'inline-flex h-full items-center gap-1.5 px-2 text-xs hover:bg-(--chrome-action-hover) whitespace-nowrap',
-    children: [
-      jsx('span', { className: 'font-semibold text-(--ui-text-secondary)', children: 'Mistral' }),
-      ...items.flatMap((item, i) => [
-        jsx('span', { key: 'sep-' + item.id, className: 'text-(--ui-text-quaternary)', children: i === 0 ? '·' : '|' }),
-        jsx('span', { key: item.id, className: 'font-medium ' + tone(m.data?.[item.id], item.threshold, s.colors),
-          children: item.label + ' ' + formatValue(m.data?.[item.id], s) })
-      ])
-    ]
-  })
+  const closeAndNavigate = (path) => {
+    setOpen(false)
+    host.navigate(path)
+  }
+  const fetched = m.data?.fetched_at
+    ? new Date(m.data.fetched_at).toLocaleString('fr-FR') : 'Jamais'
+  return jsxs(Popover, { open, onOpenChange: setOpen, children: [
+    jsx(PopoverTrigger, { asChild: true, children: jsxs('button', {
+      type: 'button',
+      'aria-label': 'Afficher les détails de consommation Mistral',
+      'aria-expanded': open,
+      title: 'Afficher les détails des quotas Mistral',
+      className: 'inline-flex h-full items-center gap-1.5 px-2 text-xs hover:bg-(--chrome-action-hover) whitespace-nowrap',
+      children: [
+        jsx('span', { className: 'font-semibold text-(--ui-text-secondary)', children: 'Mistral' }),
+        ...items.flatMap((item, i) => [
+          jsx('span', { key: 'sep-' + item.id, className: 'text-(--ui-text-quaternary)', children: i === 0 ? '·' : '|' }),
+          jsx('span', { key: item.id,
+            className: 'font-medium ' + tone(m.data?.[item.id], item.threshold, s.colors),
+            children: item.label + ' ' + formatValue(m.data?.[item.id], s) })
+        ])
+      ]
+    }) }),
+    jsxs(PopoverContent, {
+      side: 'top', align: 'end', sideOffset: 9,
+      className: 'w-80 max-w-[calc(100vw-24px)] p-3',
+      children: [
+        jsxs('div', { className: 'flex items-center justify-between gap-2 mb-3', children: [
+          jsx('strong', { className: 'text-sm text-(--ui-text-primary)', children: 'Mistral Usage' }),
+          jsx('span', { className: 'text-xs text-(--ui-text-tertiary)', children:
+            s.display === 'used' ? 'Consommé' : 'Restant' })
+        ] }),
+        jsx('div', { className: 'flex flex-col gap-2', children:
+          items.length ? items.map(item => jsx(PopoverBudget, {
+            key: item.id, label: item.title,
+            metric: m.data?.[item.id], threshold: item.threshold, settings: s
+          })) : jsx('p', { className: 'text-xs text-(--ui-text-tertiary)',
+            children: 'Aucun budget affiché. Active un indicateur dans Réglages.' }) }),
+        m.error ? jsx('p', { className: 'mt-2 text-xs text-(--ui-danger)', children: m.error }) : null,
+        jsx('p', { className: 'mt-3 mb-2 text-xs text-(--ui-text-tertiary)',
+          children: 'Dernière lecture : ' + fetched + (m.data?.cached ? ' · cache' : '') }),
+        jsxs('div', { className: 'flex items-center gap-2 border-t border-(--ui-stroke-secondary) pt-3',
+          children: [
+            jsx('button', { type: 'button',
+              className: 'rounded-md border border-(--ui-stroke-secondary) px-3 py-1.5 text-xs hover:bg-(--chrome-action-hover)',
+              onClick: () => closeAndNavigate('/mistral-usage'), children: 'Voir les détails' }),
+            jsx('button', { type: 'button',
+              className: 'rounded-md border border-(--ui-stroke-secondary) px-3 py-1.5 text-xs font-medium hover:bg-(--chrome-action-hover)',
+              onClick: () => closeAndNavigate(pluginSettingsHref(ID)), children: 'Réglages' }),
+            jsx('button', { type: 'button', disabled: m.loading,
+              title: 'Actualiser les quotas',
+              className: 'ml-auto rounded-md border border-(--ui-stroke-secondary) px-2 py-1.5 text-xs hover:bg-(--chrome-action-hover)',
+              onClick: () => m.refresh(true), children: m.loading ? '…' : '↻' })
+          ] })
+      ]
+    })
+  ] })
 }
 
 function SelectSetting({ label, value, values, change, help }) {
