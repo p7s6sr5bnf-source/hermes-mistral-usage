@@ -160,9 +160,11 @@
       return SDK.fetchJSON(API_ROOT + "/usage" + (force ? "?refresh=true" : ""))
         .then(function (latest) {
           setUsage(latest);
-          return SDK.fetchJSON(API_ROOT + "/insights?days=30");
+          // Historical insights are optional: a history error must not hide live quotas.
+          return SDK.fetchJSON(API_ROOT + "/insights?days=30")
+            .then(function (history) { setInsights(history); })
+            .catch(function () { setInsights(null); });
         })
-        .then(function (history) { setInsights(history); })
         .catch(function () {
           setError("Données indisponibles. Vérifiez le backend Hermes et l'activation du plugin.");
         })
@@ -188,6 +190,8 @@
           loading ? "Actualisation…" : "Actualiser")
       ),
       error ? h("p", { role: "alert", className: "rounded-md border border-red-500 p-3 text-sm" }, error) : null,
+      !usage && loading ? h("p", { role: "status", className: "text-sm text-muted-foreground" },
+        "Chargement des quotas…") : null,
       h("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3" },
         h(MetricCard, { name: "Vibe Code", metric: usage && usage.vibe }),
         h(MetricCard, { name: "Mistral API", metric: usage && usage.api })
