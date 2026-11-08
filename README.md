@@ -1,9 +1,9 @@
 # Hermes Mistral Usage
 
-[![Version](https://img.shields.io/badge/version-0.4.1-blue)](plugin.yaml)
+[![Version](https://img.shields.io/badge/version-0.4.2-blue)](plugin.yaml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A **read-only Mistral subscription quota monitor** for Hermes Desktop and Hermes Agent on Linux and macOS. It tracks the included **Vibe Code** and **API** budgets using Mistral's authenticated browser endpoint.
+A **read-only Mistral subscription quota monitor** for Hermes Desktop, the Hermes web dashboard (including supported mobile clients), and Hermes Agent on Linux and macOS. It tracks the included **Vibe Code** and **API** budgets using Mistral's authenticated browser endpoint.
 
 The plugin does **not** use a model, change billing settings, switch providers, or spend API credits.
 
@@ -34,6 +34,26 @@ The included API and Vibe budgets are separate from **pay-as-you-go** usage. No 
 4. Click the Mistral summary in the bottom status bar to open a compact popover. Its **Settings** button opens **Settings → Plugins → Mistral Usage**, and **View details** opens the full sidebar page.
 
 The Desktop view requests usage from the Hermes plugin API. A backend with a valid Mistral session must be configured for live readings.
+
+### Hermes Dashboard and supported mobile clients
+
+The package also includes a dedicated **Dashboard page** at `/mistral-usage`,
+using `dashboard/manifest.json` and `dashboard/dist/index.js`. It displays
+the current Vibe Code and API subscription budgets, used and remaining
+amounts, percent progress, renewal date, local history and conservative
+projections. The page adapts to narrow mobile screens.
+
+A supported client such as Hermes HQ can open this plugin page **only if its
+connected Hermes backend serves the dashboard plugin assets**. If a mobile
+client displays “Hermes didn't send this page's files”, update the installed
+plugin **on the machine running that backend**, ensure the plugin is enabled
+there, and restart/reload the backend that serves dashboard pages. Installing
+the Desktop-only JS component does not provide the Dashboard page.
+
+The Dashboard page is separate from a mobile client's built-in **Usage &
+Limits** screen. The plugin does not modify that native screen, and it does
+not provide background iOS push notifications. Desktop settings and
+notification preferences are not automatically shared with mobile clients.
 
 ### Hermes Agent (CLI)
 
@@ -154,6 +174,7 @@ python3 -m pip install fastapi
 python3 -m unittest discover -s tests -v
 python3 -m py_compile dashboard/plugin_api.py usage_history.py __init__.py scripts/configure.py
 node --check desktop/plugin.js
+node --check dashboard/dist/index.js
 hermes plugins validate .
 ```
 
