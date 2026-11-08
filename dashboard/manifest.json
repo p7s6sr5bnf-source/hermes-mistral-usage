@@ -6,7 +6,7 @@
   "version": "0.4.2",
   "tab": {
     "path": "/mistral-usage",
-    "position": "after:analytics"
+    "position": "after:skills"
   },
   "entry": "dist/index.js",
   "api": "plugin_api.py"
