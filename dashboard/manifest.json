@@ -1,7 +1,13 @@
 {
   "name": "hermes-mistral-usage",
   "label": "Mistral Usage",
-  "description": "Read-only Mistral Vibe and API billing metrics",
-  "version": "0.4.1",
+  "description": "Subscription API and Vibe Code quota metrics, historical charts and forecasts",
+  "icon": "ChartNoAxesCombined",
+  "version": "0.4.2",
+  "tab": {
+    "path": "/mistral-usage",
+    "position": "after:skills"
+  },
+  "entry": "dist/index.js",
   "api": "plugin_api.py"
 }
