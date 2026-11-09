@@ -7,7 +7,7 @@ A **read-only Mistral subscription quota monitor** for Hermes Desktop, the Herme
 
 The plugin does **not** use a model, change billing settings, switch providers, or spend API credits.
 
-> **Compatibility:** Hermes >= 0.21.2. Mistral's `billing.budget` endpoint is undocumented and can change without notice. Real-world compatibility depends on the installed Hermes version and an active Mistral web session. Linux CI has passed; Desktop/Agent integration and macOS should be verified on the target installation.
+> **Compatibility:** Hermes >= 0.21.2. Mistral's `billing.budget` endpoint is undocumented and can change without notice. Real-world compatibility depends on the installed Hermes version and an active Mistral web session. There is no CI: the checks run on the machine that pushes (`bash scripts/check-local.sh`) and pass on Linux; Desktop/Agent integration and macOS must be verified on the target installation.
 
 ## Features
 
@@ -167,7 +167,19 @@ The database contains **only** observation timestamps, metric names, renewal tim
 
 ## Development
 
-Run from the repository root:
+This repository has **no CI** and no GitHub Actions workflow: the checks run
+locally and are the only gate before a push or a pull request. From the
+repository root:
+
+```bash
+bash scripts/check-local.sh
+```
+
+The script runs the Python unit tests, `py_compile` on the Python entry points,
+`node --check` on both JavaScript bundles and a JSON validation of
+`dashboard/manifest.json`; it uses `uv` when available (nothing is installed in
+the repository) and reports any check it had to skip because a tool is missing.
+The manual equivalent, still valid:
 
 ```bash
 python3 -m pip install fastapi
@@ -178,7 +190,7 @@ node --check dashboard/dist/index.js
 hermes plugins validate .
 ```
 
-The tests use synthetic account data and do not contact Mistral or require credentials. GitHub Actions checks are **manual-only** (`workflow_dispatch`) while integration is being validated; this does not constitute macOS certification.
+The tests use synthetic account data and do not contact Mistral or require credentials. A local pass is not macOS certification, and it is the only verification available: see `AGENTS.md`, which requires the suite to be run and its result reported before any pull request.
 
 ## Security, contributions and licensing
 
